@@ -338,23 +338,37 @@ do ($ = window.jQuery, window) ->
 
       return  unless callback
 
+      # Allow browser repaint by appending to end of event queue but minimize flicker
       setTimeout ->
         callback()
-      , 50
+      , 0
 
     _init: ->
+      interval = 0.5
       init = =>
         @_width()
         @_containerPosition null, =>
+          # Ensure visible in case hidden while calculating widths
+          @$wrapper.css "visibility", "visible"
+
           @$wrapper.addClass "#{@options.baseClass}-animate"  if @options.animate
+
+      pollForVisibility = =>
+        if @$wrapper.is ":visible"
+          init()
+          clearTimeout pollTimeout
+          return
+
+        # Use exponential backoff to poll for visibility
+        interval *= 2
+        pollTimeout = setTimeout pollForVisibility, interval
+
 
       return init()  if @$wrapper.is ":visible"
 
-      initInterval = window.setInterval =>
-        if @$wrapper.is ":visible"
-          init()
-          window.clearInterval initInterval
-      , 50
+      # Hide the element to prevent flickering until it lands in the DOM
+      @$wrapper.css "visibility", "hidden"
+      pollTimeout = setTimeout pollForVisibility, 0
 
     _elementHandlers: ->
       @$element.on
